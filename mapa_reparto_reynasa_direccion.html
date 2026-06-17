@@ -52,7 +52,7 @@
  <div class="ctl"><b>Tiempo de reparto (min)</b><div style="font-size:12px;margin-top:2px"><span id="tlbl"></span></div>
   <input type="range" id="tmn" min="0" max="240" value="0" step="5" style="width:150px">
   <input type="range" id="tmx" min="0" max="240" value="240" step="5" style="width:150px"></div>
- <div class="ctl"><label><input type="checkbox" id="togp" checked> Centros de reparto Reynasa</label><label><input type="checkbox" id="togr"> Trazado de rutas</label></div>
+ <div class="ctl"><label><input type="checkbox" id="togp" checked> Centros de reparto Reynasa</label><label><input type="checkbox" id="togr"> Áreas de ruta</label></div>
  <p class="note" id="note"></p>
 </div>
 <div id="legend" class="panel"></div>
@@ -126,27 +126,7 @@ function buildTable(){
    var k=this.dataset.k,f=this.dataset.f,v=parseFloat(this.value); if(isNaN(v))return;
    ROUTES[k][f]=v; saveRoutes(); draw();});});
 }
-function resetRoutes(){ROUTES=JSON.parse(JSON.stringify(DEFAULTS));try{localStorage.removeItem('reynasa_routes');}catch(e){} document.getElementById('savehint').textContent='Valores restablecidos.'; // ---- route lines layer ----
-var routeLayer=L.layerGroup(); var routeBuilt=false;
-function buildRouteLines(){
- var byr={}; DATA.forEach(function(d){ if(d.rk.charAt(0)!=='R')return; (byr[d.rk]=byr[d.rk]||[]).push([d.lat,d.lon]); });
- var keys=Object.keys(byr), i=0;
- keys.forEach(function(rk){ var pts=byr[rk]; if(pts.length<2){i++;return;}
-  var used=new Array(pts.length).fill(false), order=[0]; used[0]=true;
-  for(var s=1;s<pts.length;s++){var last=order[order.length-1],best=-1,bd=1e9;
-   for(var j=0;j<pts.length;j++){if(used[j])continue;var dx=pts[j][0]-pts[last][0],dy=pts[j][1]-pts[last][1],dd=dx*dx+dy*dy;if(dd<bd){bd=dd;best=j;}}
-   order.push(best);used[best]=true;}
-  var line=order.map(function(k){return pts[k];});
-  var col='hsl('+((i*47)%360)+',72%,45%)'; i++;
-  L.polyline(line,{color:col,weight:1.6,opacity:.55}).bindTooltip(ROUTES[rk].name,{sticky:true}).addTo(routeLayer);
- });
- routeBuilt=true;
-}
-document.getElementById('togr').addEventListener('change',function(){
- if(this.checked){ if(!routeBuilt)buildRouteLines(); routeLayer.addTo(map);} else {map.removeLayer(routeLayer);}
-});
-
-buildTable(); draw();}
+function resetRoutes(){ROUTES=JSON.parse(JSON.stringify(DEFAULTS));try{localStorage.removeItem('reynasa_routes');}catch(e){} document.getElementById('savehint').textContent='Valores restablecidos.'; buildTable(); draw();}
 function showTab(t){
  var m=t==='map'; document.getElementById('sheet').style.display=m?'none':'block';
  document.getElementById('title').style.display=m?'block':'none';
@@ -154,25 +134,32 @@ function showTab(t){
  document.getElementById('tbMap').className=m?'on':''; document.getElementById('tbData').className=m?'':'on';
  if(m){setTimeout(function(){map.invalidateSize();},30);} else {buildTable();}
 }
-// ---- route lines layer ----
+// ---- route areas layer ----
 var routeLayer=L.layerGroup(); var routeBuilt=false;
-function buildRouteLines(){
+function chull(pts){ if(pts.length<3) return pts.slice();
+ var P=pts.map(function(p){return [p[1],p[0]];}); P.sort(function(a,b){return a[0]-b[0]||a[1]-b[1];});
+ function cr(o,a,b){return (a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);}
+ var lo=[],up=[],i;
+ for(i=0;i<P.length;i++){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],P[i])<=0)lo.pop();lo.push(P[i]);}
+ for(i=P.length-1;i>=0;i--){while(up.length>=2&&cr(up[up.length-2],up[up.length-1],P[i])<=0)up.pop();up.push(P[i]);}
+ lo.pop();up.pop(); return lo.concat(up).map(function(p){return [p[1],p[0]];}); }
+function buildRouteAreas(){
  var byr={}; DATA.forEach(function(d){ if(d.rk.charAt(0)!=='R')return; (byr[d.rk]=byr[d.rk]||[]).push([d.lat,d.lon]); });
  var keys=Object.keys(byr), i=0;
- keys.forEach(function(rk){ var pts=byr[rk]; if(pts.length<2){i++;return;}
-  var used=new Array(pts.length).fill(false), order=[0]; used[0]=true;
-  for(var s=1;s<pts.length;s++){var last=order[order.length-1],best=-1,bd=1e9;
-   for(var j=0;j<pts.length;j++){if(used[j])continue;var dx=pts[j][0]-pts[last][0],dy=pts[j][1]-pts[last][1],dd=dx*dx+dy*dy;if(dd<bd){bd=dd;best=j;}}
-   order.push(best);used[best]=true;}
-  var line=order.map(function(k){return pts[k];});
+ keys.forEach(function(rk){ var pts=byr[rk];
+  var lats=pts.map(function(p){return p[0];}).sort(function(a,b){return a-b;});
+  var lons=pts.map(function(p){return p[1];}).sort(function(a,b){return a-b;});
+  var mla=lats[Math.floor(lats.length/2)], mlo=lons[Math.floor(lons.length/2)];
+  var kept=pts.filter(function(p){return Math.abs(p[0]-mla)<0.35 && Math.abs(p[1]-mlo)<0.45;});
+  if(kept.length===0)kept=pts;
   var col='hsl('+((i*47)%360)+',72%,45%)'; i++;
-  L.polyline(line,{color:col,weight:1.6,opacity:.55}).bindTooltip(ROUTES[rk].name,{sticky:true}).addTo(routeLayer);
+  if(kept.length>=3){ L.polygon(chull(kept),{color:col,weight:1,opacity:.7,fillColor:col,fillOpacity:.16}).bindTooltip(ROUTES[rk].name+' · '+pts.length+' talleres',{sticky:true}).addTo(routeLayer); }
+  else { L.circle(kept[0],{radius:1200,color:col,weight:1,fillColor:col,fillOpacity:.16}).bindTooltip(ROUTES[rk].name,{sticky:true}).addTo(routeLayer); }
  });
  routeBuilt=true;
 }
 document.getElementById('togr').addEventListener('change',function(){
- if(this.checked){ if(!routeBuilt)buildRouteLines(); routeLayer.addTo(map);} else {map.removeLayer(routeLayer);}
+ if(this.checked){ if(!routeBuilt)buildRouteAreas(); routeLayer.addTo(map);} else {map.removeLayer(routeLayer);}
 });
-
 buildTable(); draw();
 </script></body></html>
