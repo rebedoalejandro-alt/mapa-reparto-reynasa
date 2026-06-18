@@ -79,14 +79,14 @@ function tmed(d){var r=ROUTES[d.rk]; return (r.ti+r.tx)/2;}
 function colorFor(v,th){for(var i=0;i<th.length;i++){if(v<=th[i])return COLORS[i];}return COLORS[5];}
 var map=L.map('map',{preferCanvas:true}).setView([40.42,-3.62],10);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:19,subdomains:'abcd'}).addTo(map);
-map.createPane('grayPane'); map.getPane('grayPane').style.zIndex=350; var grayRenderer=L.canvas({pane:'grayPane'});
+map.createPane('reyPane'); map.getPane('reyPane').style.zIndex=450; var reyRenderer=L.canvas({pane:'reyPane'});
 var ptLayer=L.layerGroup().addTo(map);
 function esn(n){return (''+n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
 function tip(d){var r=ROUTES[d.rk];return '<b>'+d.rs+'</b><br>'+d.dir+' · '+d.ciu+'<br>Ruta: '+r.name+'<br>Cat CallCenter: '+d.cat+'<br>Salidas/día: '+Math.round(r.freq)+'<br>Tiempo hasta entrega: '+r.ti+'–'+r.tx+' min (medio '+Math.round((r.ti+r.tx)/2)+')';}
 function draw(){
  ptLayer.clearLayers(); var th=TH[metric],n=0;
  DATA.forEach(function(d){ if(!active[d.cat])return; var tm=tmed(d); if(tm<TMIN||tm>TMAX)return; n++;
-  L.circleMarker([d.lat,d.lon],{radius:4,fillColor:colorFor(mval(d),th),color:'#444',weight:.3,fillOpacity:.8})
+  L.circleMarker([d.lat,d.lon],{renderer:reyRenderer,radius:4,fillColor:colorFor(mval(d),th),color:'#444',weight:.3,fillOpacity:.85})
    .bindTooltip(tip(d),{className:'cp',direction:'top'}).addTo(ptLayer);});
  document.getElementById('cnt').textContent=esn(n)+' talleres mostrados · '+esn(DATA.length)+' total';
  var lab=metric==='freq'?'Salidas/día de ruta':'Tiempo hasta entrega (min)';
@@ -132,7 +132,7 @@ var GRAY=[{"lat":40.30127,"lon":-2.83787,"n":"Talleres Casi","ciu":"Albalate De 
 var grayLayer=L.layerGroup(); var grayBuilt=false;
 function buildGray(){
  GRAY.forEach(function(g){
-  L.circleMarker([g.lat,g.lon],{renderer:grayRenderer,radius:3,fillColor:'#9e9e9e',color:'#6e6e6e',weight:.3,fillOpacity:.55})
+  L.circleMarker([g.lat,g.lon],{radius:3.2,fillColor:'#6b7280',color:'#374151',weight:.4,fillOpacity:.8})
    .bindTooltip('<b>'+g.n+'</b><br>'+g.ciu+(g.cat?'<br>'+g.cat:'')+(g.rt?' · &#9733;'+g.rt:''),{className:'cp',direction:'top'}).addTo(grayLayer);
  });
  grayBuilt=true;
